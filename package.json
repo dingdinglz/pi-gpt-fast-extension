@@ -1,0 +1,32 @@
+{
+  "name": "pi-gpt-fast-extension",
+  "version": "1.0.0",
+  "description": "Persistent GPT fast mode (OpenAI priority service tier) for the Pi coding agent.",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "openai",
+    "openai-codex",
+    "fast-mode",
+    "priority",
+    "service-tier"
+  ],
+  "homepage": "https://github.com/dingdinglz/pi-gpt-fast-extension#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dingdinglz/pi-gpt-fast-extension.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dingdinglz/pi-gpt-fast-extension/issues"
+  },
+  "license": "MIT",
+  "type": "module",
+  "pi": {
+    "extensions": [
+      "./extensions/gpt-fast-mode.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  }
+}
