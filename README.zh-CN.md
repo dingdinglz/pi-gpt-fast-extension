@@ -65,8 +65,8 @@ Fast Mode 是服务层设置，与 Pi 的 reasoning/thinking level（推理强�
 
 | Provider | 模型 |
 | --- | --- |
-| `openai` | `gpt-5.4`、`gpt-5.5`、`gpt-5.6-sol`、`gpt-5.6-terra`、`gpt-5.6-luna` |
-| `openai-codex` | `gpt-5.4`、`gpt-5.5`、`gpt-5.6-sol`、`gpt-5.6-terra`、`gpt-5.6-luna` |
+| `openai` | `gpt-5.4`、`gpt-5.5`、`gpt-5.6-sol`、`gpt-5.6-terra`、`gpt-5.6-luna`、`gpt-6-astra` |
+| `openai-codex` | `gpt-5.4`、`gpt-5.5`、`gpt-5.6-sol`、`gpt-5.6-terra`、`gpt-5.6-luna`、`gpt-6-astra` |
 
 模型还必须使用 `openai-responses` 或 `openai-codex-responses` API。其他 Provider、API 和模型请求不会被修改。
 
@@ -103,10 +103,22 @@ curl -fsSL \
 ```
 
 - `enabled`：持久化的 Fast Mode 开关状态。
-- `models`：允许使用 Priority 服务层的精确 `provider/model-id` 列表。
+- `models`：允许使用 Priority 服务层的精确 `provider/model-id` 列表。省略时使用当前默认白名单；显式填写数组时会替换默认列表。
 - `showStatus`：开启且当前模型符合条件时显示 `[fast mode]`。
 
 只有在确认模型 API 接受 `service_tier: "priority"` 后，才应将其加入白名单。
+
+### 升级以支持 GPT-6 Astra
+
+更新通过 GitHub 安装的扩展：
+
+```bash
+pi update git:github.com/dingdinglz/pi-gpt-fast-extension
+```
+
+如果已有的 `fast-mode.json` 包含 `models` 数组，请向其中加入 `openai/gpt-6-astra` 和 `openai-codex/gpt-6-astra`，或删除 `models` 字段以使用当前默认白名单。扩展不会自动扩大已保存的白名单，以保留自定义限制。保留现有的 `enabled` 和 `showStatus` 值。
+
+然后执行 `/reload` 和 `/fast status`。如果 Fast Mode 尚未开启，再执行 `/fast on`。
 
 ## 安全行为
 
@@ -134,7 +146,17 @@ rm ~/.pi/agent/extensions/fast-mode.json
 
 ## 兼容性
 
-已在 `@earendil-works/pi-coding-agent` 0.84.4 上测试。
+已在 `@earendil-works/pi-coding-agent` 0.84.4 和 0.85.1 上测试。GPT-6 Astra 的请求序列化已在 0.85.1 上通过两种 API 的本地模拟接口验证；这些测试不验证 OpenAI 线上 Priority 服务层是否可用。
+
+## 开发
+
+使用 Node.js 22.18+ 运行回归测试，无需安装依赖或配置 API 凭据：
+
+```bash
+npm test
+```
+
+测试使用隔离的临时配置，并模拟 Pi 扩展 API，不会请求 OpenAI。
 
 ## 参考资料
 

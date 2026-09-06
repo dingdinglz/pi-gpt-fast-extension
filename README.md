@@ -65,8 +65,8 @@ The default allowlist contains:
 
 | Provider | Models |
 | --- | --- |
-| `openai` | `gpt-5.4`, `gpt-5.5`, `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna` |
-| `openai-codex` | `gpt-5.4`, `gpt-5.5`, `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna` |
+| `openai` | `gpt-5.4`, `gpt-5.5`, `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-6-astra` |
+| `openai-codex` | `gpt-5.4`, `gpt-5.5`, `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-6-astra` |
 
 The API must also be `openai-responses` or `openai-codex-responses`. Other providers, APIs, and models are left unchanged.
 
@@ -103,10 +103,22 @@ Configuration shape:
 ```
 
 - `enabled`: persisted fast-mode state.
-- `models`: exact `provider/model-id` entries that may receive the priority tier.
+- `models`: exact `provider/model-id` entries that may receive the priority tier. When omitted, the current default allowlist is used; an explicit array replaces the defaults.
 - `showStatus`: show `[fast mode]` when enabled and eligible.
 
 Only add a model after confirming that its API accepts `service_tier: "priority"`.
+
+### Upgrading to GPT-6 Astra
+
+Update a GitHub installation:
+
+```bash
+pi update git:github.com/dingdinglz/pi-gpt-fast-extension
+```
+
+If your existing `fast-mode.json` contains a `models` array, add `openai/gpt-6-astra` and `openai-codex/gpt-6-astra` to it, or remove the `models` field to use the current defaults. Saved allowlists are not automatically expanded, so custom restrictions remain intact. Keep your existing `enabled` and `showStatus` values.
+
+Then run `/reload` and `/fast status`. Use `/fast on` if fast mode is off.
 
 ## Safety Behavior
 
@@ -134,7 +146,17 @@ rm ~/.pi/agent/extensions/fast-mode.json
 
 ## Compatibility
 
-Tested with `@earendil-works/pi-coding-agent` 0.84.4.
+Tested with `@earendil-works/pi-coding-agent` 0.84.4 and 0.85.1. GPT-6 Astra request serialization was verified on 0.85.1 using local mock endpoints for both APIs; live OpenAI priority-tier availability is not covered by these tests.
+
+## Development
+
+Run the regression tests with Node.js 22.18+ (no dependency installation or API credentials required):
+
+```bash
+npm test
+```
+
+The tests use isolated temporary configuration and mock Pi's extension API; they do not contact OpenAI.
 
 ## References
 
