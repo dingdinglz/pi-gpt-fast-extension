@@ -181,11 +181,15 @@ export default function gptFastMode(pi: ExtensionAPI) {
 		);
 	}
 
-	function persistEnabled(nextEnabled: boolean, ctx: ExtensionContext): boolean {
+	function persistEnabled(change: boolean | "toggle", ctx: ExtensionContext): boolean {
+		// An upgrade or another session may have changed the config since startup.
+		// Never overwrite its allowlist or UI settings with our cached copy.
+		const latestConfig = loadConfig(ctx);
+		const nextEnabled = change === "toggle" ? !latestConfig.enabled : change;
 		const nextConfig: FastModeConfig = {
-			...config,
+			...latestConfig,
 			enabled: nextEnabled,
-			models: [...config.models],
+			models: [...latestConfig.models],
 		};
 		if (!saveConfig(nextConfig, ctx)) return false;
 
@@ -227,11 +231,14 @@ export default function gptFastMode(pi: ExtensionAPI) {
 		handler: async (args, ctx) => {
 			const command = args.trim().toLowerCase();
 			if (command === "status") {
+				config = loadConfig(ctx);
+				enabled = config.enabled;
+				updateStatus(ctx);
 				notifyState(ctx);
 				return;
 			}
-			let nextEnabled: boolean;
-			if (command === "") nextEnabled = !enabled;
+			let nextEnabled: boolean | "toggle";
+			if (command === "") nextEnabled = "toggle";
 			else if (command === "on") nextEnabled = true;
 			else if (command === "off") nextEnabled = false;
 			else {

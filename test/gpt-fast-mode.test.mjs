@@ -137,6 +137,63 @@ for (const models of [[], ["openai-codex/gpt-5.5"], exampleConfig.models.filter(
 	});
 }
 
+for (const command of ["on", "off", ""]) {
+	test(`/fast ${command || "(toggle)"} preserves configuration changed after startup`, async () => {
+		const legacyModels = exampleConfig.models.filter((key) => !key.endsWith("/gpt-6-astra"));
+		saveConfig({ enabled: true, models: legacyModels, showStatus: true });
+		const h = createHarness();
+		assert.equal(h.request(), undefined);
+
+		// Simulate updating the allowlist while an older session is still open.
+		const updated = { ...exampleConfig, enabled: true, showStatus: false };
+		saveConfig(updated);
+		await h.command(command);
+		assert.deepEqual(readConfig(), { ...updated, enabled: command === "on" });
+		assert.equal(h.request()?.service_tier, command === "on" ? "priority" : undefined);
+		assert.equal(h.statuses.size, 0);
+	});
+}
+
+test("/fast status refreshes a changed allowlist without writing the configuration", async () => {
+	saveConfig({ enabled: true, models: ["openai-codex/gpt-5.5"] });
+	const h = createHarness();
+	const updated = { ...exampleConfig, enabled: true };
+	saveConfig(updated);
+	const before = readFileSync(configPath, "utf8");
+	await h.command("status");
+	assert.equal(readFileSync(configPath, "utf8"), before);
+	assert.equal(h.notifications.at(-1).level, "info");
+	assert.match(h.notifications.at(-1).message, /gpt-6-astra; requests use service_tier=priority/);
+	assert.equal(h.statuses.get("gpt-fast-mode"), "[fast mode]");
+	assert.equal(h.request().service_tier, "priority");
+
+	saveConfig({ ...updated, enabled: false });
+	await h.command("status");
+	assert.equal(h.notifications.at(-1).message, "Fast mode is off.");
+	assert.equal(h.statuses.size, 0);
+	assert.equal(h.request(), undefined);
+});
+
+test("/fast toggles the latest persisted state rather than another session's stale state", async () => {
+	const first = createHarness();
+	const second = createHarness();
+	await first.command("on");
+	assert.equal(readConfig().enabled, true);
+	await second.command("");
+	assert.equal(readConfig().enabled, false);
+	assert.equal(second.request(), undefined);
+});
+
+test("/fast on preserves a newly restricted allowlist", async () => {
+	saveConfig({ ...exampleConfig, enabled: true });
+	const h = createHarness();
+	const restricted = { enabled: true, models: [], showStatus: false };
+	saveConfig(restricted);
+	await h.command("on");
+	assert.deepEqual(readConfig(), restricted);
+	assert.equal(h.request(), undefined);
+});
+
 for (const tier of ["auto", "default", "flex", "priority", null, undefined]) {
 	test(`does not overwrite an explicit service_tier=${tier}`, () => {
 		saveConfig({ enabled: true });

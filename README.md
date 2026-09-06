@@ -120,6 +120,10 @@ If your existing `fast-mode.json` contains a `models` array, add `openai/gpt-6-a
 
 Then run `/reload` and `/fast status`. Use `/fast on` if fast mode is off.
 
+**Already-running sessions:** Reload or restart every Pi process using version 1.1.0 or earlier **before running `/fast on`, `/fast off`, or `/fast`**. Those older instances can overwrite an updated allowlist with their cached configuration. Clearing the conversation does not reload extension code. If the old list was already written back, restore the missing entries as described above.
+
+Starting with 1.1.1, state-changing commands read the latest configuration before saving, and `/fast status` refreshes the configuration without writing it. This preserves allowlist and UI-setting edits made since the session started.
+
 ## Safety Behavior
 
 A request is modified only when all of the following are true:
