@@ -38,6 +38,25 @@ const endpoints = [
 	{ provider: "openai", api: "openai-responses" },
 	{ provider: "openai-codex", api: "openai-codex-responses" },
 ];
+// Independent expectations: every priority-capable model in the 2026-09-30
+// Codex catalog, plus GPT-5.4 for backwards compatibility.
+const modelIds = [
+	"gpt-5.4",
+	"gpt-5.5",
+	"gpt-5.6-sol",
+	"gpt-5.6-terra",
+	"gpt-5.6-luna",
+	"gpt-6-astra",
+	"gpt-6-sol",
+	"gpt-6-luna",
+	"gpt-6.1-sol",
+	"gpt-reserve",
+	"codex-auto-review",
+];
+const newModelIds = modelIds.slice(6);
+const legacyModels = endpoints.flatMap(({ provider }) =>
+	modelIds.slice(0, 6).map((id) => `${provider}/${id}`),
+);
 
 function saveConfig(config) {
 	writeFileSync(configPath, JSON.stringify(config));
@@ -91,35 +110,50 @@ function createHarness({
 	};
 }
 
+test("the example allowlist contains every supported model for both providers exactly once", () => {
+	assert.deepEqual(exampleConfig.models, endpoints.flatMap(({ provider }) =>
+		modelIds.map((id) => `${provider}/${id}`),
+	));
+	assert.equal(new Set(exampleConfig.models).size, exampleConfig.models.length);
+});
+
 for (const endpoint of endpoints) {
-	test(`GPT-6 Astra defaults and /fast on work for ${endpoint.provider}`, async () => {
-		const h = createHarness(endpoint);
-		assert.equal(h.request(), undefined);
-		assert.equal(h.statuses.size, 0);
+	for (const id of modelIds) {
+		test(`defaults and /fast on work for ${endpoint.provider}/${id}`, async () => {
+			const h = createHarness({ ...endpoint, id });
+			assert.equal(h.request(), undefined);
+			assert.equal(h.statuses.size, 0);
 
-		await h.command("on");
-		const payload = { model: "gpt-6-astra", input: [], reasoning: { effort: "high" } };
-		const result = h.request(payload);
-		assert.deepEqual(result, { ...payload, service_tier: "priority" });
-		assert.notEqual(result, payload);
-		assert.equal("service_tier" in payload, false);
-		assert.deepEqual(readConfig(), { ...exampleConfig, enabled: true });
-		assert.equal(h.statuses.get("gpt-fast-mode"), "[fast mode]");
+			await h.command("on");
+			const payload = { model: id, input: [], reasoning: { effort: "high" } };
+			const result = h.request(payload);
+			assert.deepEqual(result, { ...payload, service_tier: "priority" });
+			assert.notEqual(result, payload);
+			assert.equal("service_tier" in payload, false);
+			assert.deepEqual(readConfig(), { ...exampleConfig, enabled: true });
+			assert.equal(h.statuses.get("gpt-fast-mode"), "[fast mode]");
 
-		await h.command("status");
-		assert.match(h.notifications.at(-1).message, /gpt-6-astra; requests use service_tier=priority/);
-		assert.equal(h.notifications.at(-1).level, "info");
-	});
+			await h.command("status");
+			assert.ok(h.notifications.at(-1).message.includes(`${endpoint.provider}/${id};`));
+			assert.match(h.notifications.at(-1).message, /requests use service_tier=priority/);
+			assert.equal(h.notifications.at(-1).level, "info");
+		});
 
-	test(`saved GPT-6 Astra configuration works for ${endpoint.provider}`, () => {
-		saveConfig({ ...exampleConfig, enabled: true });
-		assert.equal(createHarness(endpoint).request().service_tier, "priority");
-	});
-
-	for (const id of ["gpt-5.4", "gpt-5.5", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]) {
-		test(`preserves support for ${endpoint.provider}/${id}`, () => {
-			saveConfig({ enabled: true });
+		test(`saved configuration works for ${endpoint.provider}/${id}`, () => {
+			saveConfig({ ...exampleConfig, enabled: true });
 			assert.equal(createHarness({ ...endpoint, id }).request().service_tier, "priority");
+		});
+	}
+
+	for (const id of newModelIds) {
+		test(`does not silently expand a legacy allowlist for ${endpoint.provider}/${id}`, async () => {
+			saveConfig({ enabled: true, models: legacyModels });
+			const h = createHarness({ ...endpoint, id });
+			assert.equal(h.request(), undefined);
+			assert.equal(h.statuses.size, 0);
+			await h.command("on");
+			assert.deepEqual(readConfig().models, legacyModels);
+			assert.equal(h.request(), undefined);
 		});
 	}
 }
@@ -227,6 +261,15 @@ test("requires an exact model match and an object payload", () => {
 	assert.equal(h.request(), undefined);
 });
 
+test("unlisted model variants do not inherit priority support", () => {
+	saveConfig({ enabled: true });
+	for (const endpoint of endpoints) {
+		for (const id of newModelIds.map((id) => `${id}-preview`)) {
+			assert.equal(createHarness({ ...endpoint, id }).request(), undefined);
+		}
+	}
+});
+
 test("/fast off persists and --fast is not reapplied on reload or session switches", async () => {
 	const h = createHarness({ fast: true });
 	assert.equal(h.request().service_tier, "priority");
@@ -262,12 +305,16 @@ test("showStatus=false hides the indicator without disabling priority requests",
 	assert.equal(h.request().service_tier, "priority");
 });
 
-test("headless sessions support GPT-6 Astra without updating the UI", () => {
+test("headless sessions support all current models without updating the UI", () => {
 	saveConfig({ enabled: true });
-	const h = createHarness({ hasUI: false });
-	assert.equal(h.request().service_tier, "priority");
-	h.emit("model_select");
-	h.emit("session_shutdown");
+	for (const endpoint of endpoints) {
+		for (const id of modelIds) {
+			const h = createHarness({ ...endpoint, id, hasUI: false });
+			assert.equal(h.request().service_tier, "priority");
+			h.emit("model_select");
+			h.emit("session_shutdown");
+		}
+	}
 });
 
 test("invalid configuration falls back to defaults including GPT-6 Astra", async () => {

@@ -17,6 +17,22 @@ const EXTENSION_ID = "gpt-fast-mode";
 const CONFIG_PATH = join(getAgentDir(), "extensions", "fast-mode.json");
 const COMMAND_ARGS = ["on", "off", "status"] as const;
 
+// Keep a precise list rather than enabling priority for every Responses model.
+// Includes the current Codex catalog's priority-capable models and legacy GPT-5.4.
+const PRIORITY_MODEL_IDS = [
+	"gpt-5.4",
+	"gpt-5.5",
+	"gpt-5.6-sol",
+	"gpt-5.6-terra",
+	"gpt-5.6-luna",
+	"gpt-6-astra",
+	"gpt-6-sol",
+	"gpt-6-luna",
+	"gpt-6.1-sol",
+	"gpt-reserve",
+	"codex-auto-review",
+] as const;
+
 interface FastModeConfig {
 	enabled: boolean;
 	models: string[];
@@ -25,20 +41,9 @@ interface FastModeConfig {
 
 const DEFAULT_CONFIG: FastModeConfig = {
 	enabled: false,
-	models: [
-		"openai/gpt-5.4",
-		"openai/gpt-5.5",
-		"openai/gpt-5.6-sol",
-		"openai/gpt-5.6-terra",
-		"openai/gpt-5.6-luna",
-		"openai/gpt-6-astra",
-		"openai-codex/gpt-5.4",
-		"openai-codex/gpt-5.5",
-		"openai-codex/gpt-5.6-sol",
-		"openai-codex/gpt-5.6-terra",
-		"openai-codex/gpt-5.6-luna",
-		"openai-codex/gpt-6-astra",
-	],
+	models: ["openai", "openai-codex"].flatMap((provider) =>
+		PRIORITY_MODEL_IDS.map((id) => `${provider}/${id}`),
+	),
 	showStatus: true,
 };
 

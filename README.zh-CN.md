@@ -65,12 +65,14 @@ Fast Mode 是服务层设置，与 Pi 的 reasoning/thinking level（推理强�
 
 | Provider | 模型 |
 | --- | --- |
-| `openai` | `gpt-5.4`、`gpt-5.5`、`gpt-5.6-sol`、`gpt-5.6-terra`、`gpt-5.6-luna`、`gpt-6-astra` |
-| `openai-codex` | `gpt-5.4`、`gpt-5.5`、`gpt-5.6-sol`、`gpt-5.6-terra`、`gpt-5.6-luna`、`gpt-6-astra` |
+| `openai` | `gpt-5.4`、`gpt-5.5`、`gpt-5.6-sol`、`gpt-5.6-terra`、`gpt-5.6-luna`、`gpt-6-astra`、`gpt-6-sol`、`gpt-6-luna`、`gpt-6.1-sol`、`gpt-reserve`、`codex-auto-review` |
+| `openai-codex` | `gpt-5.4`、`gpt-5.5`、`gpt-5.6-sol`、`gpt-5.6-terra`、`gpt-5.6-luna`、`gpt-6-astra`、`gpt-6-sol`、`gpt-6-luna`、`gpt-6.1-sol`、`gpt-reserve`、`codex-auto-review` |
 
 模型还必须使用 `openai-responses` 或 `openai-codex-responses` API。其他 Provider、API 和模型请求不会被修改。
 
-Priority 服务层最终是否可用由 OpenAI 决定，不同模型或账户可能有所差异。
+此列表覆盖 2026-09-30 核对的 Codex 目录中全部通过 `service_tiers: [{ "id": "priority" }]` 标记支持 Fast 的模型，同时保留 GPT-5.4 的兼容支持。`gpt-reserve` 和 `codex-auto-review` 是隐藏目录条目：扩展不会向 Pi 模型选择器添加模型，使用前需要账户具备权限且模型已在 Pi 中注册。
+
+Priority 服务层最终是否可用由 OpenAI 决定，不同模型、接口或账户可能有所差异。未列入白名单的模型不会仅因使用 Responses API 就自动启用 Priority。
 
 ## 配置
 
@@ -89,14 +91,14 @@ curl -fsSL \
   -o ~/.pi/agent/extensions/fast-mode.json
 ```
 
-配置结构：
+配置结构（此示例将 Fast Mode 限定为 GPT-6.1 Sol）：
 
 ```json
 {
   "enabled": false,
   "models": [
-    "openai/gpt-5.5",
-    "openai-codex/gpt-5.5"
+    "openai/gpt-6.1-sol",
+    "openai-codex/gpt-6.1-sol"
   ],
   "showStatus": true
 }
@@ -108,7 +110,7 @@ curl -fsSL \
 
 只有在确认模型 API 接受 `service_tier: "priority"` 后，才应将其加入白名单。
 
-### 升级以支持 GPT-6 Astra
+### 升级以支持最新模型（1.2.0）
 
 更新通过 GitHub 安装的扩展：
 
@@ -116,7 +118,15 @@ curl -fsSL \
 pi update git:github.com/dingdinglz/pi-gpt-fast-extension
 ```
 
-如果已有的 `fast-mode.json` 包含 `models` 数组，请向其中加入 `openai/gpt-6-astra` 和 `openai-codex/gpt-6-astra`，或删除 `models` 字段以使用当前默认白名单。扩展不会自动扩大已保存的白名单，以保留自定义限制。保留现有的 `enabled` 和 `showStatus` 值。
+如果已有的 `fast-mode.json` 包含 `models` 数组，请删除该字段以使用当前完整默认白名单，或在 `openai/` 和 `openai-codex/` 两个前缀下补充需要的模型：
+
+- `gpt-6-sol`
+- `gpt-6-luna`
+- `gpt-6.1-sol`
+- `gpt-reserve`
+- `codex-auto-review`
+
+扩展不会自动扩大已保存的白名单，以保留自定义限制。保留现有的 `enabled` 和 `showStatus` 值。完整列表见 [`fast-mode.example.json`](fast-mode.example.json)。
 
 然后执行 `/reload` 和 `/fast status`。如果 Fast Mode 尚未开启，再执行 `/fast on`。
 
@@ -150,7 +160,7 @@ rm ~/.pi/agent/extensions/fast-mode.json
 
 ## 兼容性
 
-已在 `@earendil-works/pi-coding-agent` 0.84.4 和 0.85.1 上测试。GPT-6 Astra 的请求序列化已在 0.85.1 上通过两种 API 的本地模拟接口验证；这些测试不验证 OpenAI 线上 Priority 服务层是否可用。
+此前已在 `@earendil-works/pi-coding-agent` 0.84.4 和 0.85.1 上测试。1.2.0 另在 0.99.1 上通过真实 SDK、扩展加载器和两种 Responses API 验证了全部 22 个 Provider/模型组合，使用本地模拟接口，包含 Codex SSE 的 zstd 压缩请求。这些测试验证请求序列化，不验证 OpenAI 线上 Priority 服务层是否可用。
 
 ## 开发
 
@@ -160,7 +170,13 @@ rm ~/.pi/agent/extensions/fast-mode.json
 npm test
 ```
 
-测试使用隔离的临时配置，并模拟 Pi 扩展 API，不会请求 OpenAI。
+81 项回归测试使用隔离的临时配置，并模拟 Pi 扩展 API。可选的 SDK 集成测试默认跳过；将 `PI_TEST_PACKAGE_ROOT` 指向已安装的 Pi 0.99.1+ 包即可运行：
+
+```bash
+PI_TEST_PACKAGE_ROOT="$(npm root -g)/@earendil-works/pi-coding-agent" npm test
+```
+
+集成测试覆盖白名单中的全部模型及两种 API，验证 `/fast on`、`/fast off` 和推理强度保持不变，使用本地 HTTP 接口和模拟凭据。两套测试都不会请求 OpenAI 或读取你的真实配置。
 
 ## 参考资料
 
